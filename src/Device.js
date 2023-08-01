@@ -15,6 +15,26 @@ class Device extends EventEmitter {
     this.adapter = adapter
     this.device = device
     this.helper = new BusHelper(dbus, 'org.bluez', `/org/bluez/${adapter}/${device}`, 'org.bluez.Device1', { usePropsEvents: true })
+    this.init()
+  }
+
+  async init () {
+    this.helper.on('PropertiesChanged', (propertiesChanged) => {
+      if ('ManufacturerData' in propertiesChanged) {
+        const { value } = propertiesChanged.ManufacturerData
+        if (value) {
+          this.emit('manufacturerData', value)
+        }
+      }
+      if ('Connected' in propertiesChanged) {
+        const { value } = propertiesChanged.Connected
+        if (value) {
+          this.emit('connect', { connected: true })
+        } else {
+          this.emit('disconnect', { connected: false })
+        }
+      }
+    })
   }
 
   /**
@@ -96,6 +116,22 @@ class Device extends EventEmitter {
   }
 
   /**
+   * Advertised transmitted manufacturer data.
+   * @returns {Object.<string, any>}
+   */
+  async getManufacturerData () {
+    return this.helper.prop('ManufacturerData')
+  }
+  
+  /**
+   * Advertised transmitted data.
+   * @returns {Object.<string, any>}
+   */
+  async getAdvertisingData () {
+    return this.helper.prop('AdvertisingData')
+  }
+
+  /**
    * Connect to remote device
    */
   async connect () {
@@ -119,7 +155,7 @@ class Device extends EventEmitter {
    */
   async disconnect () {
     await this.helper.callMethod('Disconnect')
-    this.helper.removeAllListeners('PropertiesChanged') // might be improved
+    this.helper.removeListeners()
   }
 
   /**
@@ -158,6 +194,14 @@ class Device extends EventEmitter {
    * @event Device#disconnect
    * @type {object}
    * @property {boolean} connected - Indicates current connection status.
+  */
+
+/**
+   * ManufacturerData event
+   *
+   * @event Device#manufacturerData
+   * @type {object}
+   * @property {Object.<string, any>} manufacturerData - Received manufacturer data
   */
 
 module.exports = Device
